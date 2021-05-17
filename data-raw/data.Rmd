@@ -1,0 +1,109 @@
+---
+title: Clean alignment 7 data
+author: Shir Dekel
+date: '`r format(Sys.time())`'
+output_format: html_document
+---
+
+Load packages and functions
+
+```{r}
+source(DataPackageR::project_path("packages.R"))
+project_path("R") %>%
+  list.files(full.names = TRUE) %>%
+  lapply(source)
+```
+
+Clean data
+
+```{r}
+data_raw <-
+  project_extdata_path("pavlovia") %>%
+  list.files(full.names = TRUE) %>%
+  map_dfr(~ .x %>%
+    read_csv(col_types = cols()))
+
+names_to <- c("project", "dv", "alignment", "reliability_type", "reliability_amount", "npv_cond", "npv_amount")
+names_pattern <- "(.*)_cond_(.*)_(.*)A_(.*)R_(.*)R_(.*)N_(.*)"
+
+data_raw_tidy <-
+  data_raw %>%
+  group_by(subject) %>%
+  nest() %>%
+  mutate(
+    df = map(data, get_responses, names_to, names_pattern),
+    total_time = map_dbl(data, shirthesis::get_time) / 60000,
+    order = map_dbl(data, ~ .x %>%
+      pull(order_condition) %>%
+      unique()),
+    data = NULL
+  ) %>%
+  unnest(df) %>%
+  pivot_wider(names_from = "dv", values_from = "value") %>%
+  mutate(prolific = prolific %>%
+    as.character()) %>%
+  unite("participant", c(prolific, sona), na.rm = TRUE, remove = F) %>%
+  filter(!str_detect(participant, "test")) %>%
+  nest() %>%
+  rowid_to_column("id") %>%
+  unnest(data) %>%
+  ungroup() %>%
+  mutate(
+    across(where(shirthesis::check_numeric), as.numeric),
+    across(c(
+      id, order
+    ), as.factor),
+    across(
+      c(
+        alignment, reliability_amount, npv_cond
+      ),
+      ~ .x %>%
+        fct_relevel(c("low", "high"))
+    ),
+    across(
+      reliability_type,
+      ~ .x %>%
+        fct_relevel(c("imp", "exp"))
+    )
+  )
+
+## Order
+order_conditions <- list(
+  c(1, 2, 3, 4),
+  c(3, 4, 1, 2),
+  c(4, 3, 2, 1),
+  c(2, 1, 4, 3)
+)
+
+conditions_labels <- cross2(c("I", "E"), c("L", "H")) %>%
+  map(~ str_c(.x, collapse = "")) %>%
+  unlist()
+
+order_levels <- order_conditions %>%
+  map(~ .x %>%
+    map(~ conditions_labels[.x]) %>%
+    unlist() %>%
+    str_c(collapse = "_")) %>%
+  set_names(c(1:4) %>% as.character()) %>%
+  unlist()
+
+data <-
+  data_raw_tidy %>%
+  mutate(
+    order = recode(order, !!!order_levels),
+    reliability_type_order = case_when(
+      order == "IL_EL_IH_EH" | order == "IH_EH_IL_EL" ~ "impR_expR",
+      order == "EH_IH_EL_IL" | order == "EL_IL_EH_IH" ~ "expR_impR"
+    ),
+    alignment_order = case_when(
+      order == "IL_EL_IH_EH" | order == "EL_IL_EH_IH" ~ "lowA_highA",
+      order == "EH_IH_EL_IL" | order == "IH_EH_IL_EL" ~ "highA_lowA"
+    ),
+    reliability_type_order = reliability_type_order %>% as.factor(),
+    alignment_order = alignment_order %>%
+      as.factor(),
+    sample = "prolific_sona"
+  ) %>%
+  select(-c(contact, address, participant, sona, prolific))
+```
+
