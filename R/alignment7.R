@@ -1,17 +1,16 @@
 #' alignment7
-#' A data package for alignment7.
+#' A data package for the Alignment 7 experiment.
 #' @docType package
 #' @aliases alignment7-package
-#' @title Package Title
+#' @title Alignment 7 experiment
 #' @name alignment7
-#' @description A description of the data package
+#' @description Data and materials for the Alignment 7 experiment.
 #' @details Use \code{data(package='alignment7')$results[, 3]} to see a list of available data sets in this data package
 #'     and/or DataPackageR::load_all
 #' _datasets() to load them.
 #' @seealso
 #' \link{data}
 NULL
-
 
 
 
@@ -42,7 +41,10 @@ NULL
 #' \item{alignment_order}{}
 #' \item{sample}{}
 #' }
-#' @source The data comes from________________________.
+#' @source The data was collected using Prolific.
 #' @seealso
 #' \link{alignment7}
 NULL
+
+
+
